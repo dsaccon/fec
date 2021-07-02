@@ -40,6 +40,7 @@ class CompanyDB(ormar.Model):
     broke_promise: bool = ormar.Boolean(nullable=False)
     created: dt.datetime = ormar.DateTime(nullable=False)
     last_updated: dt.datetime = ormar.DateTime(nullable=False)
+    active: bool = ormar.Boolean(nullable=False, default=False)
 
 class CompanyNameAPI(BaseModel):
     name: str
