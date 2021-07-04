@@ -23,35 +23,43 @@ async def company_add(company: CompanyAPI):
         name=company.name,
         industry=company.industry,
         starting_date=company.starting_date,
-        metadata='',
-        statement=False,
-        broke_promise=False,
+        metadata=company.metadata,
+        statement=company.statement,
+        broke_promise=company.broke_promise,
         created=now,
-        last_updated=now)
+        last_updated=now,
+        active=True)
     return company
 
-@app.post("/company/edit/")
-async def company_edit(company: CompanyAPI):
-    comp = await CompanyDB.objects.get(committee_id=company.committee_id)
-    comp.name = company.name
-    comp.industry = company.industry
-    comp.starting_date = company.starting_date
-    comp.last_updated = dt.datetime.utcnow()
-    return await comp.update()
-
-@app.get("/company/delete/{committee_id}")
-async def company_delete(committee_id: str):
+@app.post("/company/edit/{_id}")
+async def company_edit(company: CompanyAPI, _id: int):
     try:
-        comp = await CompanyDB.objects.get(committee_id=committee_id)
-        await comp.delete()
-        return True
+        comp = await CompanyDB.objects.get(id=_id)
+        comp.committee_id = company.committee_id
+        comp.name = company.name
+        comp.industry = company.industry
+        comp.starting_date = company.starting_date
+        comp.metadata = company.metadata
+        comp.statement = company.statement
+        comp.broke_promise = company.broke_promise
+        comp.last_updated = dt.datetime.utcnow()
+        return await comp.update()
     except ormar.exceptions.NoMatch:
         return False
 
-@app.get("/company/view/{committee_id}")
-async def company_view(committee_id: str):
+@app.get("/company/delete/{_id}")
+async def company_delete(_id: int):
     try:
-        return await CompanyDB.objects.get(committee_id=committee_id)
+        comp = await CompanyDB.objects.get(id=_id)
+        comp.active = False
+        return await comp.update()
+    except ormar.exceptions.NoMatch:
+        return False
+
+@app.get("/company/view/{_id}")
+async def company_view(_id: int):
+    try:
+        return await CompanyDB.objects.get(id=_id)
     except ormar.exceptions.NoMatch:
         return False
 
