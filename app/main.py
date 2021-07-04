@@ -34,7 +34,7 @@ async def company_add(company: CompanyAPI):
 @app.post("/company/edit/{_id}")
 async def company_edit(company: CompanyAPI, _id: int):
     try:
-        comp = await CompanyDB.objects.get(id=_id)
+        comp = await CompanyDB.objects.get(id=_id, active=True)
         comp.committee_id = company.committee_id
         comp.name = company.name
         comp.industry = company.industry
@@ -59,13 +59,13 @@ async def company_delete(_id: int):
 @app.get("/company/view/{_id}")
 async def company_view(_id: int):
     try:
-        return await CompanyDB.objects.get(id=_id)
+        return await CompanyDB.objects.get(id=_id, active=True)
     except ormar.exceptions.NoMatch:
         return False
 
 @app.get("/company/get-all/")
 async def company_view():
-    return await CompanyDB.objects.all()
+    return await CompanyDB.objects.all(active=True)
 
 @app.post("/company/search/")
 async def company_search(company: CompanyNameAPI):
