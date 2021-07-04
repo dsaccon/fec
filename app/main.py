@@ -59,13 +59,22 @@ async def company_delete(_id: int):
 @app.get("/company/view/{_id}")
 async def company_view(_id: int):
     try:
-        return await CompanyDB.objects.get(id=_id, active=True)
+        comp = await CompanyDB.objects.get(id=_id, active=True)
+        comp.name = comp.name.encode('utf-8').decode('unicode-escape')
+        comp.industry = comp.industry.encode('utf-8').decode('unicode-escape')
+        comp.metadata = comp.metadata.encode('utf-8').decode('unicode-escape')
+        return comp
     except ormar.exceptions.NoMatch:
         return False
 
 @app.get("/company/get-all/")
 async def company_view():
-    return await CompanyDB.objects.all(active=True)
+    companies = await CompanyDB.objects.all(active=True)
+    for comp in companies:
+        comp.name = comp.name.encode('utf-8').decode('unicode-escape')
+        comp.industry = comp.industry.encode('utf-8').decode('unicode-escape')
+        comp.metadata = comp.metadata.encode('utf-8').decode('unicode-escape')
+    return companies
 
 @app.post("/company/search/")
 async def company_search(company: CompanyNameAPI):
