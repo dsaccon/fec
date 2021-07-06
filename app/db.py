@@ -18,13 +18,19 @@ class BaseMeta(ormar.ModelMeta):
     database = database
 
 
-class User(ormar.Model):
+class Transactions(ormar.Model):
     class Meta(BaseMeta):
-        tablename = "users"
+        tablename = "transactions"
 
     id: int = ormar.Integer(primary_key=True)
-    email: str = ormar.String(max_length=128, unique=True, nullable=False)
-    active: bool = ormar.Boolean(default=True, nullable=False)
+    transaction_id: str = ormar.String(max_length=32, unique=True, nullable=False)
+    committee_id: str = ormar.String(max_length=128, unique=False, nullable=False)
+    company_name: str = ormar.String(max_length=128, unique=False, nullable=False)
+    recipient_name: str = ormar.String(max_length=128, unique=False, nullable=False)
+    recipient_state: str = ormar.String(max_length=128, unique=False, nullable=False)
+    description: str = ormar.String(max_length=128, unique=False, nullable=False)
+    date: str = ormar.String(max_length=128, unique=False, nullable=False)
+    amount: float = ormar.Float(unique=False, nullable=False)
 
 class CompanyDB(ormar.Model):
     class Meta(BaseMeta):
@@ -42,8 +48,10 @@ class CompanyDB(ormar.Model):
     last_updated: dt.datetime = ormar.DateTime(unique=False, nullable=False)
     active: bool = ormar.Boolean(unique=False, nullable=False, default=False)
 
+
 class CompanyNameAPI(BaseModel):
     name: str
+
 
 class CompanyAPI(BaseModel):
     committee_id: str
