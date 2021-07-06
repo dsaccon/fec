@@ -6,7 +6,7 @@ import datetime as dt
 import requests
 import ormar
 
-from app.db import database, User, CompanyDB, CompanyNameAPI, CompanyAPI
+from app.db import database, CompanyDB, CompanyNameAPI, CompanyAPI
 from app.http import SingletonAioHttp
 
 from dotenv import dotenv_values
@@ -78,9 +78,16 @@ async def company_view():
 
 @app.post("/company/search/")
 async def company_search(company: CompanyNameAPI):
-    url = f'https://api.open.fec.gov/v1/names/committees/?api_key={API_KEY}={company.name}'
-    resp = await SingletonAioHttp.query_url(url)
-    return requests.get(url).json()
+    params = {
+        'sort_hide_null': 'false',
+        'q': company.name,
+        'sort_nulls_last': 'false',
+        'api_key': API_KEY,
+        'sort': 'name',
+        'sort_null_only': 'false',
+    }
+    url = f'https://api.open.fec.gov/v1/names/committees/'
+    return await SingletonAioHttp.query_url(url, data=params)
 
 ##
 #@app.post("/companies/get/")
@@ -113,8 +120,6 @@ async def startup():
     if not database.is_connected:
         await database.connect()
     SingletonAioHttp.get_aiohttp_client()
-    # create a dummy entry
-    await User.objects.get_or_create(email="test@test.com")
 
 
 @app.on_event("shutdown")
