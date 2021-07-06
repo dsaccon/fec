@@ -28,16 +28,16 @@ class SingletonAioHttp:
             cls.aiohttp_client = None
 
     @classmethod
-    async def query_url(cls, url: str) -> Any:
+    async def query_url(cls, url: str, method: str='get', data: dict=None) -> Any:
         client = cls.get_aiohttp_client()
-
+        meth = getattr(client, method)
+        if data is None:
+            data = {}
         try:
-            async with client.post(url) as response:
+            async with meth(url, params=data) as response:
                 if response.status != 200:
                     return {"ERROR OCCURED" + str(await response.text())}
-
                 json_result = await response.json()
         except Exception as e:
             return {"ERROR": e}
-
         return json_result
