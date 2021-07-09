@@ -28,6 +28,7 @@ class Transactions(ormar.Model):
     company_name: str = ormar.String(max_length=128, unique=False, nullable=False)
     recipient_name: str = ormar.String(max_length=128, unique=False, nullable=False)
     recipient_state: str = ormar.String(max_length=128, unique=False, nullable=False)
+    candidate_id: str = ormar.String(max_length=32, unique=False, nullable=False)
     description: str = ormar.String(max_length=128, unique=False, nullable=False)
     date: str = ormar.String(max_length=128, unique=False, nullable=False)
     amount: float = ormar.Float(unique=False, nullable=False)
