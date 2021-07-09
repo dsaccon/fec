@@ -7,7 +7,7 @@ import requests
 import ormar
 
 from app.db import database, CompanyDB, CompanyNameAPI, CompanyAPI
-from app.http import SingletonAioHttp
+from app.http_api import SingletonAioHttp
 
 from dotenv import dotenv_values
 
