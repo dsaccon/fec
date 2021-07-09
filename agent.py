@@ -1,11 +1,13 @@
 import os
+import datetime as dt
 import asyncio
+import logging
 import uvloop
 from dotenv import dotenv_values, load_dotenv
 import requests
 
 from app.db import database, CompanyDB, Transactions
-from app.http import SingletonAioHttp
+from app.http_api import SingletonAioHttp
 
 load_dotenv()
 API_KEY = os.environ.get('API_KEY')
@@ -28,28 +30,48 @@ async def get_companies():
 
 async def api_get_transactions(company):
     params = get_params(company)
-    return await SingletonAioHttp.query_url(url, data=params)
+    transactions = await SingletonAioHttp.query_url(url, data=params)
+    return transactions.get('results')
 
 async def db_get_transactions(company):
     transactions = await Transactions.objects.all(committee_id=company)
     return [tx.transaction_id for tx in transactions]
 
-async def update_company_transactions(transactions):
-    db_transactions = await db_get_transactions(transactions[0]['committee_id'])
+async def update_company_transactions(committee_id):
+    transactions = await api_get_transactions(committee_id)
+    if transactions is None:
+        return
+    db_transactions = await db_get_transactions(committee_id)
     api_transactions = {tx['transaction_id'] for tx in transactions}
     new_transactions = api_transactions - set(db_transactions)
     for txid in new_transactions:
         tx = [t for t in transactions if t['transaction_id'] == txid][0]
+        txid = tx['transaction_id']
+        cdid = tx['candidate_id']
+        dscr = tx['disbursement_description']
+        date = tx['disbursement_date']
+        if txid is None:
+            continue
+            txid = ''
+        if cdid is None:
+            cdid = ''
+        if date is None:
+            date = ''
+        if dscr is None:
+            dscr = ''
         await Transactions.objects.create(
-            transaction_id=tx['transaction_id'],
+            transaction_id=txid,
             committee_id=tx['committee_id'],
             company_name=tx['committee']['name'],
             recipient_name=tx['recipient_name'],
             recipient_state=tx['recipient_state'],
-            description=tx['disbursement_description'],
-            date=tx['disbursement_date'],
+            candidate_id=cdid,
+            description=dscr,
+            date=date,
             amount=tx['disbursement_amount']
         )
+    if new_transactions:
+        print(f'New transactions added for {committee_id}: {new_transactions}')
 
 async def startup():
     if not database.is_connected:
@@ -64,22 +86,19 @@ async def shutdown():
 async def main():
     await startup()
 
-    companies = await get_companies()
-    companies_ids = [c.committee_id for c in companies]
-    transactions = await api_get_transactions(companies_ids[0])
-    await update_company_transactions(transactions['results'])
-    quit()
+    while True:
+        print(dt.datetime.utcnow())
+        companies = await get_companies()
+        aio_tasks = []
+        for cid in [c.committee_id for c in companies]: 
+            aio_tasks += [update_company_transactions(cid)]
+        await asyncio.gather(*aio_tasks)
+        await asyncio.sleep(60)
 
-    resp = await SingletonAioHttp.query_url(url, data=params)
-#    url = f"https://www.fec.gov/data/committee/{'C00542365'}/?tab=spending#total-disbursements"
-#    resp = await SingletonAioHttp.query_url(url)
-    import json
-    print(resp)
-    print(json.dumps(resp, indent=4))
-#    for r in resp['results']:
-#        print(r['candidate_last_name'])
     await shutdown()
 
 if __name__ == '__main__':
+    logfile = 'app/logs/agent.log' 
+    logging.basicConfig(filename=logfile, level=logging.INFO)
     uvloop.install()
     asyncio.run(main())
