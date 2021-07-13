@@ -26,6 +26,7 @@ class Transactions(ormar.Model):
     transaction_id: str = ormar.String(max_length=32, unique=True, nullable=False)
     committee_id: str = ormar.String(max_length=128, unique=False, nullable=False)
     company_name: str = ormar.String(max_length=128, unique=False, nullable=False)
+    industry: str = ormar.String(max_length=128, unique=False, nullable=False)
     recipient_name: str = ormar.String(max_length=128, unique=False, nullable=False)
     recipient_state: str = ormar.String(max_length=128, unique=False, nullable=False)
     candidate_id: str = ormar.String(max_length=32, unique=False, nullable=False)
@@ -54,6 +55,14 @@ class CompanyNameAPI(BaseModel):
     name: str
 
 
+class CompanyIndustryAPI(BaseModel):
+    industry: str
+
+
+class CompanyCommmitteeIdAPI(BaseModel):
+    committee_id: str
+
+
 class CompanyAPI(BaseModel):
     committee_id: str
     name: str
@@ -64,4 +73,8 @@ class CompanyAPI(BaseModel):
     broke_promise: bool
 
 engine = sqlalchemy.create_engine(settings.db_url)
-metadata.create_all(engine)
+try:
+    metadata.create_all(engine, checkfirst=True)
+except sqlalchemy.exc.IntegrityError as e:
+    # Race condition on startup (api/agent both importing this module), known pg issue
+    print(e)
