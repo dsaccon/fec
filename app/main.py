@@ -6,7 +6,8 @@ import datetime as dt
 import requests
 import ormar
 
-from app.db import database, CompanyDB, CompanyNameAPI, CompanyAPI
+from app.db import database, Transactions, CompanyDB, CompanyNameAPI
+from app.db import CompanyCommmitteeIdAPI, CompanyIndustryAPI, CompanyAPI
 from app.http_api import SingletonAioHttp
 
 from dotenv import dotenv_values
@@ -14,6 +15,9 @@ from dotenv import dotenv_values
 app = FastAPI(title="FEC data collection API")
 
 API_KEY=dotenv_values('.env').get('API_KEY')
+
+
+# Admin endpoints
 
 @app.post("/company/add/")
 async def company_add(company: CompanyAPI):
@@ -89,32 +93,33 @@ async def company_search(company: CompanyNameAPI):
     url = f'https://api.open.fec.gov/v1/names/committees/'
     return await SingletonAioHttp.query_url(url, data=params)
 
-##
-#@app.post("/companies/get/")
-#async def companies_get(company: CompanyAPI):
-#    await asyncio.sleep(0)
-#    return None
-#
-#@app.post("/data/donations-by-industry")
-#async def companies_get(company: CompanyAPI):
-#    await asyncio.sleep(0)
-#    return None
 
-#@app.post("/data/donations-by-industry")
-#async def donations_by_industry():
-#    # add company to table
-#    pass
+# Frontend endpoints
+
+@app.post("/data/donations-by-industry")
+async def data_donations_by_industry(company: CompanyIndustryAPI):
+    industry_transactions = await Transactions.objects.all(industry=company.industry)
+    for tx in industry_transactions:
+        tx.company_name = tx.company_name.encode('utf-8').decode('unicode-escape')
+        tx.industry = tx.industry.encode('utf-8').decode('unicode-escape')
+    return industry_transactions
+
+@app.get("/data/all-transactions/")
+async def data_all_transactions():
+    transactions = await Transactions.objects.all()
+    for tx in transactions:
+        tx.company_name = tx.company_name.encode('utf-8').decode('unicode-escape')
+        tx.industry = tx.industry.encode('utf-8').decode('unicode-escape')
+    return transactions
+
+@app.post("/data/company-detail")
+async def data_company_detail(company: CompanyCommmitteeIdAPI):
+    company_transactions = await Transactions.objects.all(committee_id=company.committee_id)
+    return company_transactions
+
+
 #
-#@app.post("/data/all-transactions")
-#async def all_transactions():
-#    # add company to table
-#    pass
-#
-#@app.post("/data/company-detail")
-#async def company_detail():
-#    # add company to table
-#    pass
-#
+
 @app.on_event("startup")
 async def startup():
     if not database.is_connected:
