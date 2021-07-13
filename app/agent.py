@@ -37,11 +37,11 @@ async def db_get_transactions(company):
     transactions = await Transactions.objects.all(committee_id=company)
     return [tx.transaction_id for tx in transactions]
 
-async def update_company_transactions(committee_id):
-    transactions = await api_get_transactions(committee_id)
+async def update_company_transactions(company):
+    transactions = await api_get_transactions(company.committee_id)
     if transactions is None:
         return
-    db_transactions = await db_get_transactions(committee_id)
+    db_transactions = await db_get_transactions(company.committee_id)
     api_transactions = {tx['transaction_id'] for tx in transactions}
     new_transactions = api_transactions - set(db_transactions)
     for txid in new_transactions:
@@ -63,6 +63,7 @@ async def update_company_transactions(committee_id):
             transaction_id=txid,
             committee_id=tx['committee_id'],
             company_name=tx['committee']['name'],
+            industry=company.industry,
             recipient_name=tx['recipient_name'],
             recipient_state=tx['recipient_state'],
             candidate_id=cdid,
@@ -71,8 +72,23 @@ async def update_company_transactions(committee_id):
             amount=tx['disbursement_amount']
         )
     if new_transactions:
-        logging.info(f'New transactions added for {committee_id}: {new_transactions}')
+        logging.info(f'New transactions added for {company.committee_id}: {new_transactions}')
 
+async def main():
+    await startup()
+
+    while True:
+        logging.info(dt.datetime.utcnow())
+        companies = await get_companies()
+        aio_tasks = []
+        for company in companies:
+            aio_tasks += [update_company_transactions(company)]
+        await asyncio.gather(*aio_tasks)
+        await asyncio.sleep(60)
+
+    await shutdown()
+
+#
 async def startup():
     if not database.is_connected:
         await database.connect()
@@ -83,19 +99,6 @@ async def shutdown():
         await database.disconnect()
     await SingletonAioHttp.close_aiohttp_client()
 
-async def main():
-    await startup()
-
-    while True:
-        logging.info(dt.datetime.utcnow())
-        companies = await get_companies()
-        aio_tasks = []
-        for cid in [c.committee_id for c in companies]: 
-            aio_tasks += [update_company_transactions(cid)]
-        await asyncio.gather(*aio_tasks)
-        await asyncio.sleep(60)
-
-    await shutdown()
 
 if __name__ == '__main__':
     logfile = 'app/logs/agent.log'
