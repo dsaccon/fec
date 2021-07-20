@@ -3,11 +3,12 @@
 from fastapi import FastAPI
 
 import datetime as dt
-import requests
+import asyncio
 import ormar
 
 from app.db import database, Transactions, CompanyDB, CompanyNameAPI
-from app.db import CompanyCommmitteeIdAPI, CompanyIndustryAPI, CompanyAPI
+from app.db import CompanyCommmitteeIdAPI, CompanyAPI
+from app.db import CompanyIndustryAPI, CompanyRecipientAPI, CorporateDonationsAPI
 from app.http_api import SingletonAioHttp
 
 from dotenv import dotenv_values
@@ -22,17 +23,30 @@ API_KEY=dotenv_values('.env').get('API_KEY')
 @app.post("/company/add/")
 async def company_add(company: CompanyAPI):
     now = dt.datetime.utcnow()
-    comp = await CompanyDB.objects.create(
-        committee_id=company.committee_id,
-        name=company.name,
-        industry=company.industry,
-        starting_date=company.starting_date,
-        metadata=company.metadata,
-        statement=company.statement,
-        broke_promise=company.broke_promise,
-        created=now,
-        last_updated=now,
-        active=True)
+    comp = await CompanyDB.objects.get(committee_id=company.committee_id, name=company.name)
+    if comp.id is None:
+        await CompanyDB.objects.update_or_create(
+            committee_id=company.committee_id,
+            name=company.name,
+            industry=company.industry,
+            starting_date=company.starting_date,
+            metadata=company.metadata,
+            statement=company.statement,
+            broke_promise=company.broke_promise,
+            created=now,
+            last_updated=now,
+            active=True)
+    else:
+        await CompanyDB.objects.update_or_create(
+            id=comp.id,
+            industry=company.industry,
+            starting_date=company.starting_date,
+            metadata=company.metadata,
+            statement=company.statement,
+            broke_promise=company.broke_promise,
+            created=now,
+            last_updated=now,
+            active=True)
     return company
 
 @app.post("/company/edit/{_id}")
@@ -96,13 +110,26 @@ async def company_search(company: CompanyNameAPI):
 
 # Frontend endpoints
 
-@app.post("/data/donations-by-industry")
-async def data_donations_by_industry(company: CompanyIndustryAPI):
-    industry_transactions = await Transactions.objects.all(industry=company.industry)
-    for tx in industry_transactions:
-        tx.company_name = tx.company_name.encode('utf-8').decode('unicode-escape')
-        tx.industry = tx.industry.encode('utf-8').decode('unicode-escape')
-    return industry_transactions
+@app.get("/data/top-donations")
+async def top_donations():
+    ind_query = """SELECT industry, SUM (amount) FROM transactions GROUP BY industry ORDER BY SUM (amount) DESC"""
+    rcp_query = """SELECT recipient_name, SUM (amount) FROM transactions GROUP BY recipient_name ORDER BY SUM (amount) DESC"""
+    aio_tasks = [
+        database.fetch_all(query=ind_query),
+        database.fetch_all(query=rcp_query)
+    ]
+    top_industries, top_recipients = await asyncio.gather(*aio_tasks)
+    top_industries = top_industries[:10]
+    top_recipients = top_recipients[:10]
+    top_industries = {ind.get('industry'): ind.get('sum') for ind in top_industries}
+    top_recipients = {ind.get('recipient_name'): ind.get('sum') for ind in top_recipients}
+    return {'by_industry': top_industries, 'by_recipient': top_recipients}
+
+
+@app.post("/data/corporate-donations")
+async def corporate_donations(params: CorporateDonationsAPI):
+    return params
+
 
 @app.get("/data/all-transactions/")
 async def data_all_transactions():
