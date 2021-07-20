@@ -14,8 +14,8 @@ API_KEY = os.environ.get('API_KEY')
 
 url = 'https://api.open.fec.gov/v1/schedules/schedule_b/'
 
-
-def get_params(committee_id):
+# Company Transactions related
+def get_params(committee_id: str):
     return {
         'sort_hide_null': 'false',
         'committee_id': committee_id,
@@ -28,16 +28,16 @@ def get_params(committee_id):
 async def get_companies():
     return await CompanyDB.objects.all(active=True)
 
-async def api_get_transactions(company):
-    params = get_params(company)
+async def api_get_transactions(committee_id: str):
+    params = get_params(committee_id)
     transactions = await SingletonAioHttp.query_url(url, data=params)
     return transactions.get('results')
 
-async def db_get_transactions(company):
-    transactions = await Transactions.objects.all(committee_id=company)
+async def db_get_transactions(committee_id: str):
+    transactions = await Transactions.objects.all(committee_id=committee_id)
     return [tx.transaction_id for tx in transactions]
 
-async def update_company_transactions(company):
+async def update_company_transactions(company: CompanyDB):
     transactions = await api_get_transactions(company.committee_id)
     if transactions is None:
         return
@@ -64,7 +64,7 @@ async def update_company_transactions(company):
             committee_id=tx['committee_id'],
             company_name=tx['committee']['name'],
             industry=company.industry,
-            recipient_name=tx['recipient_name'],
+            recipient_name=f"{tx['candidate_first_name']} {tx['candidate_last_name']}",
             recipient_state=tx['recipient_state'],
             candidate_id=cdid,
             description=dscr,
@@ -73,6 +73,7 @@ async def update_company_transactions(company):
         )
     if new_transactions:
         logging.info(f'New transactions added for {company.committee_id}: {new_transactions}')
+
 
 async def main():
     await startup()
