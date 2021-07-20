@@ -34,6 +34,17 @@ class Transactions(ormar.Model):
     date: str = ormar.String(max_length=128, unique=False, nullable=False)
     amount: float = ormar.Float(unique=False, nullable=False)
 
+
+class Adjustments(ormar.Model):
+    class Meta(BaseMeta):
+        tablename = "adjustments"
+
+    id: int = ormar.Integer(primary_key=True)
+    type: str = ormar.String(max_length=64, unique=False, nullable=False)
+    value: str = ormar.String(max_length=128, unique=False, nullable=False)
+    amount: float = ormar.Float(unique=False, nullable=False)
+
+
 class CompanyDB(ormar.Model):
     class Meta(BaseMeta):
         tablename = "company"
@@ -59,6 +70,10 @@ class CompanyIndustryAPI(BaseModel):
     industry: str
 
 
+class CompanyRecipientAPI(BaseModel):
+    recipient: str
+
+
 class CompanyCommmitteeIdAPI(BaseModel):
     committee_id: str
 
@@ -71,6 +86,14 @@ class CompanyAPI(BaseModel):
     metadata: str
     statement: bool
     broke_promise: bool
+
+
+class CorporateDonationsAPI(BaseModel):
+    date_start: str
+    date_end: str
+    statement: bool
+    broke_promise: bool
+
 
 engine = sqlalchemy.create_engine(settings.db_url)
 try:
