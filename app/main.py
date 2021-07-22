@@ -128,7 +128,49 @@ async def top_donations():
 
 @app.post("/data/corporate-donations")
 async def corporate_donations(params: CorporateDonationsAPI):
-    return params
+    companies = await CompanyDB.objects.all(active=True)
+    for comp in companies:
+        comp.name = comp.name.encode('utf-8').decode('unicode-escape')
+        comp.industry = comp.industry.encode('utf-8').decode('unicode-escape')
+        comp.metadata = comp.metadata.encode('utf-8').decode('unicode-escape')
+
+    comp_query = (
+        f"SELECT company_name, SUM (amount)\n"
+        f"  FROM transactions\n"
+        f"  GROUP BY company_name\n"
+        f"  ORDER BY SUM (amount) DESC\n")
+    companies_tot_contr = await database.fetch_all(query=comp_query)
+    aio_tasks = []
+    for company in companies_tot_contr:
+        query = (
+            f"SELECT recipient_name, company_name, SUM (amount)\n"
+            f"  FROM transactions\n"
+            f"  WHERE company_name = '{company.get('company_name')}'\n"
+            f"  GROUP BY recipient_name, company_name\n"
+            f"  ORDER BY SUM (amount) DESC\n")
+        aio_tasks += [database.fetch_all(query=query)]
+    companies_sorted_txs = await asyncio.gather(*aio_tasks)
+
+    results = {}
+    for company in companies_sorted_txs:
+        statement = [
+            comp.statement for comp in companies
+            if comp.name == company[0].get('company_name')
+        ][0]
+        tot_contr = [
+            comp.get('sum')
+            for comp in companies_tot_contr
+            if comp.get('company_name') == company[0].get('company_name')
+        ][0]
+        results[company[0].get('company_name')] = {
+            'statement': statement,
+            'total_contributions': tot_contr,
+            'all_recipients': {
+                recipient.get('recipient_name'): recipient.get('sum')
+                for recipient in company
+            }
+        }
+    return results
 
 
 @app.get("/data/all-transactions/")
