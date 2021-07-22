@@ -62,7 +62,7 @@ async def update_company_transactions(company: CompanyDB):
         await Transactions.objects.create(
             transaction_id=txid,
             committee_id=tx['committee_id'],
-            company_name=tx['committee']['name'],
+            company_name=company.name,
             industry=company.industry,
             recipient_name=f"{tx['candidate_first_name']} {tx['candidate_last_name']}",
             recipient_state=tx['recipient_state'],
