@@ -6,8 +6,8 @@ import datetime as dt
 import asyncio
 import ormar
 
-from app.db import database, Transactions, CompanyDB, CompanyNameAPI
-from app.db import CompanyCommmitteeIdAPI, CompanyAPI
+from app.db import database, Transactions, CompanyDB, Candidates
+from app.db import CompanyCommmitteeIdAPI, CompanyAPI, CompanyNameAPI
 from app.db import CompanyIndustryAPI, CompanyRecipientAPI, CorporateDonationsAPI
 from app.http_api import SingletonAioHttp
 
@@ -15,7 +15,7 @@ from dotenv import dotenv_values
 
 app = FastAPI(title="FEC data collection API")
 
-API_KEY=dotenv_values('.env').get('API_KEY')
+API_KEY=dotenv_values('.env').get('API_KEY_0')
 
 
 # Admin endpoints
@@ -23,8 +23,8 @@ API_KEY=dotenv_values('.env').get('API_KEY')
 @app.post("/company/add/")
 async def company_add(company: CompanyAPI):
     now = dt.datetime.utcnow()
-    comp = await CompanyDB.objects.get(committee_id=company.committee_id, name=company.name)
-    if comp.id is None:
+    comp = await CompanyDB.objects.all(committee_id=company.committee_id, name=company.name)
+    if len(comp) == 0:
         await CompanyDB.objects.update_or_create(
             committee_id=company.committee_id,
             name=company.name,
@@ -35,18 +35,21 @@ async def company_add(company: CompanyAPI):
             broke_promise=company.broke_promise,
             created=now,
             last_updated=now,
+            last_api_accessed=dt.datetime(1970, 1, 1),
             active=True)
-    else:
+    elif len(comp) == 1:
         await CompanyDB.objects.update_or_create(
-            id=comp.id,
+            id=comp[0].id,
             industry=company.industry,
             starting_date=company.starting_date,
             metadata=company.metadata,
             statement=company.statement,
             broke_promise=company.broke_promise,
-            created=now,
+            created=comp[0].created,
             last_updated=now,
             active=True)
+    else:
+        return {'msg': 'unknown state'}
     return company
 
 @app.post("/company/edit/{_id}")
@@ -129,10 +132,26 @@ async def top_donations():
 @app.post("/data/corporate-donations")
 async def corporate_donations(params: CorporateDonationsAPI):
     companies = await CompanyDB.objects.all(active=True)
+    candidates = await Candidates.objects.all(active=True)
+    candidates = {
+        c.committee_id: {
+            'first_name': c.first_name,
+            'last_name': c.last_name,
+            'district': c.district,
+            'state': c.state,
+            'active': c.active,
+            'priority': c.priority,
+        }
+        for c in candidates
+    }
     for comp in companies:
         comp.name = comp.name.encode('utf-8').decode('unicode-escape')
         comp.industry = comp.industry.encode('utf-8').decode('unicode-escape')
         comp.metadata = comp.metadata.encode('utf-8').decode('unicode-escape')
+
+    get_company_from_tx = lambda tx: [
+        comp for comp in companies if comp.name == tx[0].get('company_name')
+    ][0]
 
     comp_query = (
         f"SELECT company_name, SUM (amount)\n"
@@ -140,34 +159,54 @@ async def corporate_donations(params: CorporateDonationsAPI):
         f"  GROUP BY company_name\n"
         f"  ORDER BY SUM (amount) DESC\n")
     companies_tot_contr = await database.fetch_all(query=comp_query)
+
     aio_tasks = []
     for company in companies_tot_contr:
+        active = get_company_from_tx([company]).active
+        if not active:
+            continue
         query = (
-            f"SELECT recipient_name, company_name, SUM (amount)\n"
+            f"SELECT candidate_id, company_name, SUM (amount)\n"
             f"  FROM transactions\n"
             f"  WHERE company_name = '{company.get('company_name')}'\n"
-            f"  GROUP BY recipient_name, company_name\n"
+            f"  GROUP BY candidate_id, company_name\n"
             f"  ORDER BY SUM (amount) DESC\n")
         aio_tasks += [database.fetch_all(query=query)]
-    companies_sorted_txs = await asyncio.gather(*aio_tasks)
+    sorted_txs = await asyncio.gather(*aio_tasks)
+    for tx in sorted_txs:
+        i_insert = -1
+        for i, rcpt in enumerate(tx):
+            if candidates[rcpt.get('candidate_id')]['priority']:
+                item = tx.pop(i)
+                i_insert += 1
+                tx.insert(i_insert, item)
 
     results = {}
-    for company in companies_sorted_txs:
-        statement = [
-            comp.statement for comp in companies
-            if comp.name == company[0].get('company_name')
-        ][0]
+    for tx in sorted_txs:
+        statement = get_company_from_tx(tx).statement
         tot_contr = [
             comp.get('sum')
             for comp in companies_tot_contr
-            if comp.get('company_name') == company[0].get('company_name')
+            if comp.get('company_name') == tx[0].get('company_name')
         ][0]
-        results[company[0].get('company_name')] = {
+        comp_committee_id = [
+            c.committee_id for c in companies
+            if c.name == tx[0].get('company_name')
+        ][0]
+        results[comp_committee_id] = {
             'statement': statement,
+            'company_name': tx[0].get('company_name'),
             'total_contributions': tot_contr,
             'all_recipients': {
-                recipient.get('recipient_name'): recipient.get('sum')
-                for recipient in company
+                rcpt.get('candidate_id'): {
+                    'contributions': rcpt.get('sum'),
+                    'first_name': candidates[rcpt.get('candidate_id')]['first_name'],
+                    'last_name': candidates[rcpt.get('candidate_id')]['last_name'],
+                    'district': candidates[rcpt.get('candidate_id')]['district'],
+                    'state': candidates[rcpt.get('candidate_id')]['state'],
+                    'active': candidates[rcpt.get('candidate_id')]['active'],
+                }
+                for rcpt in tx
             }
         }
     return results
