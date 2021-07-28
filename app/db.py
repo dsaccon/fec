@@ -35,6 +35,29 @@ class Transactions(ormar.Model):
     amount: float = ormar.Float(unique=False, nullable=False)
 
 
+class TransactionsLog(ormar.Model):
+    class Meta(BaseMeta):
+        tablename = "transactions_log"
+
+    id: int = ormar.Integer(primary_key=True)
+    timestamp: dt.datetime = ormar.DateTime(unique=False, nullable=False)
+    data: str = ormar.Text(unique=False, nullable=False)
+
+
+class Candidates(ormar.Model):
+    class Meta(BaseMeta):
+        tablename = "candidates"
+
+    id: int = ormar.Integer(primary_key=True)
+    committee_id: str = ormar.String(max_length=128, unique=False, nullable=False)
+    first_name: str = ormar.String(max_length=128, unique=False, nullable=False)
+    last_name: str = ormar.String(max_length=128, unique=False, nullable=False)
+    district: str = ormar.String(max_length=128, unique=False, nullable=True)
+    state: str = ormar.String(max_length=128, unique=False, nullable=False)
+    active: bool = ormar.Boolean(unique=False, nullable=False, default=True)
+    priority: bool = ormar.Boolean(unique=False, nullable=False, default=False)
+
+
 class Adjustments(ormar.Model):
     class Meta(BaseMeta):
         tablename = "adjustments"
@@ -59,6 +82,7 @@ class CompanyDB(ormar.Model):
     broke_promise: bool = ormar.Boolean(unique=False, nullable=False)
     created: dt.datetime = ormar.DateTime(unique=False, nullable=False)
     last_updated: dt.datetime = ormar.DateTime(unique=False, nullable=False)
+    last_api_accessed: dt.datetime = ormar.DateTime(unique=False, nullable=False)
     active: bool = ormar.Boolean(unique=False, nullable=False, default=False)
 
 
