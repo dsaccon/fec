@@ -74,7 +74,7 @@ class CompanyDB(ormar.Model):
 
     id: int = ormar.Integer(primary_key=True)
     committee_id: str = ormar.String(max_length=128, unique=True, nullable=False)
-    name: str = ormar.String(max_length=128, unique=True, nullable=False)
+    name: str = ormar.String(max_length=256, unique=True, nullable=False)
     industry: str = ormar.String(max_length=128, unique=False, nullable=False)
     starting_date: str = ormar.String(max_length=128, unique=False, nullable=False)
     metadata: str = ormar.Text(unique=False, nullable=False)
