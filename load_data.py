@@ -7,6 +7,7 @@ import asyncpg
 import psycopg2
 import requests
 import databases
+import datetime as dt
 from dotenv import load_dotenv
 
 load_dotenv()
@@ -18,7 +19,7 @@ def get_ip():
     ip_addr = txt[0]['NetworkSettings']['Networks']['fec_default']['IPAddress']
     return ip_addr
 
-def build_query():
+def build_query_candidates():
     objectors = []
     with open('objectors.csv') as f:
         csv_reader = csv.reader(f, delimiter=',')
@@ -32,13 +33,36 @@ def build_query():
     query = query[:-2] + ';'
     return query
 
-async def run_async():
+async def run_candidates_async():
     conn = await asyncpg.connect(
         user='fec_db',
         password='fec_db',
         database='fec_db',
         host=get_ip())
-    await conn.execute(build_query())
+    await conn.execute(build_query_candidates())
+
+def build_query_companies():
+    companies = []
+    with open('companies.csv') as f:
+        csv_reader = csv.reader(f, delimiter=',')
+        for row in csv_reader:
+            companies.append(row)
+    now = dt.datetime.utcnow()
+    query = "INSERT INTO company (committee_id, name, industry, starting_date, metadata, statement, broke_promise, created, last_updated, last_api_accessed, active)\n"
+    query += "VALUES\n"
+    for c in companies[1:]:
+        name = c[0].replace("'", "''")
+        query += f"('{c[2]}','{name}','tbd','2021-01-01','',False,False,'{now}','{now}','{dt.datetime(1970,1,1)}',True),\n"
+    query = query[:-2] + ';'
+    return query
+
+async def run_companies_async():
+    conn = await asyncpg.connect(
+        user='fec_db',
+        password='fec_db',
+        database='fec_db',
+        host=get_ip())
+    await conn.execute(build_query_companies())
 
 def run_sync():
     try:
@@ -212,5 +236,6 @@ def get_txs():
 
 if __name__ == '__main__':
 #    get_txs()
-    asyncio.run(run_async()) 
-    add_companies()
+    asyncio.run(run_candidates_async())
+    asyncio.run(run_companies_async())
+#    add_companies()
