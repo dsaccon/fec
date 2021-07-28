@@ -1,6 +1,7 @@
 import os
 import json
 import datetime as dt
+import random
 import asyncio
 import logging
 import uvloop
@@ -75,11 +76,11 @@ async def api_get_transactions(company: CompanyDB):
                 transactions += txs.get('results')
                 last_indexes = txs.get('pagination')['last_indexes']
             elif 'error' in txs and txs['error']['code'] == 'OVER_RATE_LIMIT':
-                await asyncio.sleep(0.5)
+                await asyncio.sleep(0.25)
                 print('rate limit error:', committee_id) ### tmp
-            elif 'error' in txs:
-                await asyncio.sleep(0.5)
-                print('error:', txs['error']['code'], committee_id) ### tmp
+            elif 'ERROR' in txs:
+                await asyncio.sleep(0.25)
+                print('ERROR:', txs, committee_id) ### tmp
             else:
                 try:
                     print(now, '1:', committee_id, len(txs['results']))
@@ -155,8 +156,10 @@ async def main():
         logging.info(dt.datetime.utcnow())
         companies = await get_companies()
         aio_tasks = []
+        print('len companies:', len(companies)) ### tmp
         for company in companies:
             aio_tasks += [update_company_transactions(company)]
+            #await update_company_transactions(company)
         await asyncio.gather(*aio_tasks)
         await asyncio.sleep(60)
 
