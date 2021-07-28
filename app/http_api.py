@@ -36,7 +36,7 @@ class SingletonAioHttp:
         try:
             async with meth(url, params=data) as response:
                 if response.status != 200:
-                    return {"ERROR OCCURED" + str(await response.text())}
+                    json_result = await response.json()
                 json_result = await response.json()
         except Exception as e:
             return {"ERROR": e}
